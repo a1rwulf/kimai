@@ -16,6 +16,8 @@ use App\Form\Type\TeamType;
 use App\Form\Type\YearPickerType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -38,12 +40,31 @@ final class YearlyUserListForm extends AbstractType
         $builder->add('customer', CustomerType::class, [
             'required' => false,
             'width' => false,
+            'project_enabled' => true,
+            'ignore_date' => true,
         ]);
-        $builder->add('project', ProjectType::class, [
+        $projectOptions = [
             'multiple' => false,
             'required' => false,
             'width' => false,
-        ]);
+        ];
+        $builder->add('project', ProjectType::class, $projectOptions);
+        // limits the project select to the submitted customer
+        $builder->addEventListener(
+            FormEvents::PRE_SUBMIT,
+            function (FormEvent $event) use ($projectOptions): void {
+                /** @var array<string, mixed> $data */
+                $data = $event->getData();
+
+                if (!\array_key_exists('customer', $data) || !is_numeric($data['customer'])) {
+                    return;
+                }
+
+                $event->getForm()->add('project', ProjectType::class, array_merge($projectOptions, [
+                    'customers' => (int) $data['customer'],
+                ]));
+            }
+        );
         $builder->add('sumType', ReportSumType::class);
     }
 
